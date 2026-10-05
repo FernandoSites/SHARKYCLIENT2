@@ -1,0 +1,57 @@
+name: Extract SharkyClient
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  extract:
+    if: ${{ github.event.head_commit.message != 'Extract SharkyClient source' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract project
+        shell: bash
+        run: |
+          set -e
+          if [ ! -f "SharkyClient.zip" ]; then
+            echo "SharkyClient.zip not found. Nothing to extract."
+            exit 0
+          fi
+
+          rm -rf .sharkyunpack
+          mkdir .sharkyunpack
+          unzip -q "SharkyClient.zip" -d .sharkyunpack
+
+          root=""
+          first_dir="$(find .sharkyunpack -mindepth 1 -maxdepth 1 -type d | head -n 1 || true)"
+          if [ -n "$first_dir" ]; then
+            root="$first_dir"
+          else
+            root=".sharkyunpack"
+          fi
+
+          cp -a "$root"/. .
+          rm -rf .sharkyunpack "SharkyClient.zip"
+
+          rm -rf .idea
+          find . -maxdepth 3 -type d -name build -prune -exec rm -rf {} + || true
+          find . -maxdepth 3 -type d -name .gradle -prune -exec rm -rf {} + || true
+
+      - name: Commit extracted source
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+          git commit -m "Extract SharkyClient source"
+          git push
